@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -12,6 +13,16 @@ import app.db.models  # noqa: F401
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Override sqlalchemy.url from DATABASE_URL env var if set (for Render/Railway/production)
+_db_url = os.environ.get("DATABASE_URL")
+if _db_url:
+    # Fix postgres:// → postgresql+asyncpg:// (Render gives the old format)
+    if _db_url.startswith("postgres://"):
+        _db_url = _db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif _db_url.startswith("postgresql://") and "+asyncpg" not in _db_url:
+        _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    config.set_main_option("sqlalchemy.url", _db_url)
 
 target_metadata = Base.metadata
 

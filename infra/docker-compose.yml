@@ -1,0 +1,106 @@
+version: "3.9"
+
+services:
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: nataprep_postgres
+    environment:
+      POSTGRES_DB: nataprep
+      POSTGRES_USER: nataprep
+      POSTGRES_PASSWORD: nataprep
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nataprep"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: nataprep_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Qdrant (Vector DB) — optional for Phase 2
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: nataprep_qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    profiles:
+      - vector_db  # Use: docker-compose --profile vector_db up
+
+  # Backend API
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: nataprep_backend
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nataprep:nataprep@postgres:5432/nataprep
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: "false"
+      
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: nataprep_celery
+    environment:
+      DATABASE_URL: postgresql+asyncpg://nataprep:nataprep@postgres:5432/nataprep
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    depends_on:
+      - redis
+      - postgres
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+    profiles:
+      - workers
+
+  # Frontend
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: nataprep_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:

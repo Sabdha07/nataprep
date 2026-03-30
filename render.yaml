@@ -20,7 +20,7 @@ services:
         generateValue: true
       - key: REDIS_URL
         sync: false          # set manually from Upstash
-      - key: ANTHROPIC_API_KEY
+      - key: OPENAI_API_KEY
         sync: false          # set manually
       - key: ALLOWED_ORIGINS
         sync: false          # set to your Vercel URL after deploy

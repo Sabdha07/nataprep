@@ -61,6 +61,7 @@ async def chat_json(
     system: str = "",
     model: str | None = None,
     max_tokens: int | None = None,
+    temperature: float = 0.3,
 ) -> Any:
     """
     Send a chat request expecting JSON response.
@@ -78,7 +79,7 @@ async def chat_json(
     response = await client.chat.completions.create(
         model=model or settings.LLM_MODEL,
         max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
-        temperature=0.3,  # lower temp for structured output
+        temperature=temperature,
         response_format={"type": "json_object"},
         messages=full_messages,  # type: ignore[arg-type]
     )

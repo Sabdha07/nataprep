@@ -54,6 +54,7 @@ class QuestionGenerationAgent(BaseAgent):
             concept = result.scalar_one_or_none()
 
         questions_created = []
+        errors = []
         for i in range(count):
             try:
                 question_data = await self._generate_question(
@@ -64,13 +65,16 @@ class QuestionGenerationAgent(BaseAgent):
                 saved = await self._save_question(question_data, concept)
                 questions_created.append(str(saved.id))
             except Exception as e:
-                log.warning("question_gen_failed", index=i, error=str(e))
+                error_msg = str(e)
+                log.warning("question_gen_failed", index=i, error=error_msg)
+                errors.append(f"Q{i+1}: {error_msg}")
 
         return {
             "concept_id": concept_id,
             "requested": count,
             "created": len(questions_created),
             "question_ids": questions_created,
+            "errors": errors,
         }
 
     async def _generate_question(

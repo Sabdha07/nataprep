@@ -65,7 +65,14 @@ class QuestionGenerationAgent(BaseAgent):
                 saved = await self._save_question(question_data, concept)
                 questions_created.append(str(saved.id))
             except Exception as e:
-                error_msg = str(e)
+                # Unwrap tenacity RetryError to get actual cause
+                actual = e
+                if hasattr(e, 'last_attempt'):
+                    try:
+                        actual = e.last_attempt.exception()
+                    except Exception:
+                        pass
+                error_msg = f"{type(actual).__name__}: {actual}"
                 log.warning("question_gen_failed", index=i, error=error_msg)
                 errors.append(f"Q{i+1}: {error_msg}")
 
